@@ -1,6 +1,7 @@
 import os
 import re
 import shutil
+from tqdm import tqdm
 import yaml
 from typing import Optional
 
@@ -151,60 +152,61 @@ def build_merged_dataset(
     dry_run: bool = True,
 ) -> dict[str, int]:
     """Build the merged dataset (V2 + V3) with a PER-VIDEO train/valid split.
-
+ 
     Every video ends up entirely in train or entirely in valid, which
     avoids the leakage caused by Roboflow's original random per-frame
     split (near-duplicate frames from the same video ending up in both
     train and valid).
     No separate test split is created: the real evaluation is running
     predict.py on our own videos.
-
-    If output_dir already exists and dry_run=False, it is
+ 
+    WARNING: if output_dir already exists and dry_run=False, it is
     DELETED and rebuilt from scratch (shutil.rmtree).
-
+ 
     Args:
         output_dir: Destination folder.
         valid_video_ids: Video IDs to send to valid (e.g. {"video-3"}).
         dry_run: If True (default), nothing is written to disk -- only
             counts how many files would end up in train/valid, so the
             numbers can be checked before copying anything for real.
-
+ 
     Returns:
         dict[str, int]: {"train": n, "valid": n} -- file counts per split.
     """
-    print()
+    print("\n=== MERGING DATASETS === ")
     if not dry_run and os.path.isdir(output_dir):
-        print(f"Removing existing merged dataset at: {output_dir}")
+        print(f" Removing existing merged dataset at: {output_dir}")
         shutil.rmtree(output_dir)
-
-    print(f"Building merged dataset at: {output_dir}")
-
+ 
     counts = {"train": 0, "valid": 0}
-
+ 
     for dataset_path in (V2, V3):
         by_video, file_split = list_all_images_by_video(dataset_path)
-
+ 
         if "unknown" in by_video:
             print(
                 f"WARNING: {len(by_video['unknown'])} files in {dataset_path} "
                 f"do not match the video filename pattern and will be SKIPPED."
             )
-
+ 
         assignment = assign_split_by_video(by_video, valid_video_ids)
-
-        for fname, split in assignment.items():
+ 
+        dataset_name = os.path.basename(dataset_path)
+        iterator = tqdm(assignment.items(), desc=f" Copying {dataset_name}", unit="file") if not dry_run else assignment.items()
+ 
+        for fname, split in iterator:
             video_id = get_source_video(fname)
             if video_id is None:
                 continue  # already reported above as "unknown"
-
+ 
             orig_split = file_split[fname]
             src_img = os.path.join(dataset_path, orig_split, "images", fname)
             label_name = os.path.splitext(fname)[0] + ".txt"
             src_label = os.path.join(dataset_path, orig_split, "labels", label_name)
-
+ 
             dst_img_dir = os.path.join(output_dir, split, "images")
             dst_label_dir = os.path.join(output_dir, split, "labels")
-
+ 
             if not dry_run:
                 os.makedirs(dst_img_dir, exist_ok=True)
                 os.makedirs(dst_label_dir, exist_ok=True)
@@ -213,17 +215,18 @@ def build_merged_dataset(
                     shutil.copy2(src_label, os.path.join(dst_label_dir, label_name))
                 else:
                     print(f"WARNING: missing label for {fname}")
-
+ 
             counts[split] += 1
-
+ 
     if not dry_run:
         write_merged_data_yaml(output_dir)
-
-    mode = "DRY RUN (no files copied)" if dry_run else "MERGED DATASET BUILT"
-    print(f"\n[{mode}] Per-video split result:")
+ 
+    mode = "DRY RUN (no files copied)" if dry_run else "REAL COPY"
+    print(f"\n [{mode}] Per-video split result:")
     print(f"  train: {counts['train']} images")
     print(f"  valid: {counts['valid']} images")
-
+    print(f"  TOTAL: {counts['train'] + counts['valid']} images")
+ 
     return counts
 
 def check_dataset(path: str) -> dict:
@@ -249,7 +252,7 @@ def check_dataset(path: str) -> dict:
     Raises:
         FileNotFoundError: If the dataset path or data.yaml is missing.
     """
-    print("\nSANITY CHECK")
+    print("\n=== SANITY CHECK === ")
 
     info: dict = {"path": path, "splits": {}}
 
@@ -295,14 +298,14 @@ def check_dataset(path: str) -> dict:
     print(f" Classes ({info['num_classes']}): {names}")
     for split, counts in info["splits"].items():
         if counts is None:
-            print(f"  {split}: missing")
+            print(f" {split}: missing")
         else:
             mismatch = " <-- MISMATCH" if counts["n_images"] != counts["n_labels"] else ""
-            print(f"  {split}: {counts['n_images']} images, {counts['n_labels']} labels{mismatch}")
+            print(f" {split}: {counts['n_images']} images, {counts['n_labels']} labels{mismatch}")
             info['total_images'] = info.get('total_images', 0) + counts['n_images']
             info['total_labels'] = info.get('total_labels', 0) + counts['n_labels']
 
-    print(f" Total files: {info['total_images']}\n Total labels: {info['total_labels']}")
+    print(f" TOTAL: {info['total_images']} images, {info['total_labels']} labels")
     return info
 
 
