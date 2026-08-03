@@ -1,6 +1,11 @@
-__pycache__/
 .vscode/
 .ipynb_checkpoints/
+.venv/
 .env
+
+__pycache__/
+*.pyc
+
 output/
 models/
+runs/

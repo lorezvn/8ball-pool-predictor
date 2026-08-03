@@ -6,6 +6,12 @@ Project developed for the Computer Vision Course 2025/2026
 - Davide Vittucci (1903954)
 - Paolo Marchetti (1986485)
 
+## How to run
+1. Install dependencies 
+    ```python
+    pip install -r requirements.txt
+    ```
+
 ## TO-DO 
 - [ ] Ottimizzare processi di merging datasets
 - [ ] Detect palle, stecca, direzione
