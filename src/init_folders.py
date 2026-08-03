@@ -1,5 +1,5 @@
 import os
 
 def create_folders():
-    if not os.path.exists("models"): 
-        os.makedirs("models")
+    os.makedirs("models", exist_ok=True)
+    os.makedirs("output", exist_ok=True)

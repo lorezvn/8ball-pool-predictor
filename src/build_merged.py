@@ -1,11 +1,13 @@
 import os
+import sys
 import re
 import shutil
 from tqdm import tqdm
 import yaml
 from typing import Optional
 
-from .config import V2, V3, MERGED_DIR
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from config import V2, V3, MERGED_DIR
 
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png")
 LABEL_EXTENSIONS = (".txt",)
@@ -141,7 +143,7 @@ def write_merged_data_yaml(output_dir: str, source_dataset_path: str = V2) -> st
     yaml_path = os.path.join(output_dir, "data.yaml")
     os.makedirs(output_dir, exist_ok=True)
     with open(yaml_path, "w", encoding="utf-8") as f:
-        yaml.safe_dump(merged_yaml, f, allow_unicode=True)
+        yaml.safe_dump(merged_yaml, f, allow_unicode=True, default_flow_style=None)
 
     return yaml_path
 
