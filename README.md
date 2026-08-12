@@ -18,3 +18,4 @@ Project developed for the Computer Vision Course 2025/2026
 - [ ] Mappa 2D
 - [ ] Sistemare struttura del progetto
 - [ ] Dimostrazione visiva
+- [ ] Angolazione 
