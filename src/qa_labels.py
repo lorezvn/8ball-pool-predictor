@@ -7,7 +7,7 @@ import yaml
 from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from config import SEED, MERGED_DIR
+from config import SEED, MERGED_DIR, OUTPUT_DIR
 
 
 def load_class_names(dataset_path: str) -> list[str]:
@@ -92,7 +92,6 @@ def qa_sample(
     dataset_path: str = MERGED_DIR,
     split: str = "train",
     n_samples: int = 10,
-    output_dir: str = "output/qa_labels",
     debug: bool = False,
     delete: bool = False
 ) -> list[str]:
@@ -107,7 +106,6 @@ def qa_sample(
         dataset_path: Root path of the dataset to check (default: MERGED_DIR).
         split: Which split to sample from ("train", "valid" or "test").
         n_samples: How many images to sample.
-        output_dir: Where to save the annotated images.
         debug: Boolean flag used for debugging.
         delete: if it's true the existing files at output_dir will be deleted.
 
@@ -125,6 +123,8 @@ def qa_sample(
 
     random.seed(SEED)
     sample = random.sample(all_images, min(n_samples, len(all_images)))
+
+    output_dir = os.path.join(OUTPUT_DIR, "qa_labels")
 
     os.makedirs(output_dir, exist_ok=True)
 
