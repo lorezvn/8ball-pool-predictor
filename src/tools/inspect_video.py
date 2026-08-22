@@ -1,9 +1,7 @@
 import os
-import sys
-
 import cv2
 
-from .config import OUTPUT_DIR
+from ..config import OUTPUT_DIR
 
 
 def inspect_video(
@@ -15,9 +13,6 @@ def inspect_video(
     Args:
         video_path: path of the video.
         n_samples: how many frames to save.
-
-    Returns:
-        dict with fps, n_frames, width, height, duration, samples.
     """
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -61,12 +56,3 @@ def inspect_video(
     print(f"\n Saved {len(saved)} sample frames to: {output_dir}")
     for p in saved:
         print(f"  {p}")
-
-    return {
-        "fps": fps,
-        "n_frames": n_frames,
-        "width": width,
-        "height": height,
-        "duration": duration,
-        "samples": saved,
-    }
