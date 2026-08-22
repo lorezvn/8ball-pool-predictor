@@ -13,7 +13,9 @@ Project developed for the Computer Vision Course 2025/2026
     ```
 
 ## TO-DO 
-- [ ] Ottimizzare processi di merging datasets
+- [x] Ottimizzare processi di merging datasets
+- [x] Detect tavolo, detect pockets
+- [ ] Sistemare la visualizzazione dell'overlay generale
 - [ ] Detect palle, stecca, direzione
 - [ ] Mappa 2D
 - [ ] Sistemare struttura del progetto
