@@ -1,19 +1,25 @@
 import os
 import cv2
+import sys
+from pathlib import Path
 
-from ..config import OUTPUT_DIR
+# Add 'src' directory to system path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
+from config import OUTPUT_DIR, VIDEOS
 
 def inspect_video(
-    video_path: str,
+    video_filename: str,
     n_samples: int = 5,
 ) -> dict:
     """Open a video, print its properties and save evenly spaced sample frames.
 
     Args:
-        video_path: path of the video.
+        video_filename: filename of the video.
         n_samples: how many frames to save.
     """
+
+    video_path = os.path.join(VIDEOS, video_filename)
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
         raise FileNotFoundError(f"Cannot open video: {video_path}")
@@ -56,3 +62,6 @@ def inspect_video(
     print(f"\n Saved {len(saved)} sample frames to: {output_dir}")
     for p in saved:
         print(f"  {p}")
+
+if __name__ == "__main__":
+    inspect_video("video2.mp4", n_samples=6)        
