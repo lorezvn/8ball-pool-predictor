@@ -31,7 +31,7 @@ def detect_balls(frame: np.ndarray, conf: float = 0.25, model: YOLO = None) -> l
         x1, y1, x2, y2 = b.xyxy[0].int().tolist()
         cls_id = int(b.cls[0])
         label = model.names[cls_id] if model.names else str(cls_id)
-        confidence = float(b.conf[0])
+        confidence = round(float(b.conf[0]), 2)
 
         balls.append({
             "box": (x1, y1, x2, y2),
@@ -50,12 +50,13 @@ def draw_ball_overlay(frame: np.ndarray, balls: list[dict]) -> np.ndarray:
     for ball in balls:
         x1, y1, x2, y2 = ball["box"]
         label = ball["label"]
+        confidence = ball["conf"]
         color = (0, 255, 0) if label == "0" else (0, 0, 255)
 
         cv2.rectangle(overlay, (x1, y1), (x2, y2), color, 2)
         cv2.putText(
             overlay,
-            label,
+            f"{label} ({confidence})",
             (x1, max(12, y1 - 4)),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.6,
@@ -88,4 +89,5 @@ def save_ball_outputs(video_filename: str, frame_index: int = 0):
 
 
 if __name__ == "__main__":
-    save_ball_outputs("video2.mp4")
+    for i in range(2, 6):
+        save_ball_outputs(f"video{i}.mp4")

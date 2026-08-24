@@ -85,7 +85,7 @@ def find_pockets(mask: np.ndarray, corners: np.ndarray) -> list[tuple[np.ndarray
 
 
 def save_pocket_outputs(video_filename: str, frame_index: int = 0):
-    """Detects table and pockets on a frame, projecting results to canonical view and saving outputs."""
+    """Detects pockets on a frame, projecting results to canonical view and saving outputs."""
     video_path = os.path.join(VIDEOS, video_filename)
     cap = cv2.VideoCapture(video_path)
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
@@ -112,7 +112,7 @@ def save_pocket_outputs(video_filename: str, frame_index: int = 0):
 
     # Draw overlays
     overlay = frame.copy()
-    cv2.polylines(overlay, [corners.astype(int)], isClosed=True, color=(0, 255, 255), thickness=2)
+    #cv2.polylines(overlay, [corners.astype(int)], isClosed=True, color=(0, 255, 255), thickness=2)
 
     for p in centers:
         cv2.circle(overlay, (int(p[0]), int(p[1])), CAPTURE_R, (0, 0, 255), 3)
@@ -122,7 +122,7 @@ def save_pocket_outputs(video_filename: str, frame_index: int = 0):
         cv2.circle(topdown, (int(p[0]), int(p[1])), CAPTURE_R, (0, 0, 255), 3)
         cv2.circle(topdown, (int(p[0]), int(p[1])), 4, (0, 255, 255), -1)
 
-    # 5. Save outputs
+    # Save outputs
     out_dir = os.path.join(OUTPUT_DIR, "table", "pockets")
     os.makedirs(out_dir, exist_ok=True)
     tag = f"{Path(video_filename).stem}_f{frame_index}"

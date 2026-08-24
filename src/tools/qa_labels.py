@@ -5,40 +5,22 @@ import cv2
 import shutil
 import yaml
 from tqdm import tqdm
+from pathlib import Path
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 from config import SEED, MERGED_DIR, OUTPUT_DIR
 
 
 def load_class_names(dataset_path: str) -> list[str]:
-    """Read the class names from a dataset's data.yaml.
-
-    Args:
-        dataset_path: Root path of the dataset (e.g. MERGED_DIR, V2, V3).
-
-    Returns:
-        list[str]: Class names, indexed by YOLO class id
-        (names[i] is the label for class id i).
-    """
+    """Read the class names from a dataset's data.yaml."""
     yaml_path = os.path.join(dataset_path, "data.yaml")
     with open(yaml_path, "r", encoding="utf-8") as f:
         data_yaml = yaml.safe_load(f)
     return data_yaml["names"]
 
 
-def read_yolo_labels(label_path: str) -> list[tuple[int, float, float, float, float]]:
-    """Read a YOLO-format label file.
-
-    Each line is: class_id x_center y_center width height, all normalized
-    to [0, 1] relative to the image size.
-
-    Args:
-        label_path: Path to a single .txt label file.
-
-    Returns:
-        list of (class_id, x_center, y_center, width, height).
-        Empty list if the file doesn't exist (unlabeled image).
-    """
+def read_yolo_labels(label_path: str) -> list[tuple]:
+    """Read a YOLO-format label file: class_id, x_center, y_center, width, height."""
     if not os.path.isfile(label_path):
         return []
 
@@ -55,19 +37,12 @@ def read_yolo_labels(label_path: str) -> list[tuple[int, float, float, float, fl
     return boxes
 
 
-def draw_boxes(image, boxes, class_names):
-    """Draw YOLO-format bounding boxes and class labels on an image.
-
-    Args:
-        image: Image as a numpy array (BGR, as loaded by cv2.imread).
-        boxes: List of (class_id, x_center, y_center, width, height),
-            normalized as in read_yolo_labels.
-        class_names: List of class names, indexed by class_id.
-
-    Returns:
-        The image with boxes drawn on it (modified in place, also returned
-        for convenience).
-    """
+def draw_boxes(
+    image: cv2.Mat, 
+    boxes: list[tuple], 
+    class_names: list[str]
+) -> cv2.Mat:
+    """Draw bounding boxes and class labels onto the image."""
     img_h, img_w = image.shape[:2]
 
     for class_id, x_center, y_center, width, height in boxes:
@@ -77,12 +52,18 @@ def draw_boxes(image, boxes, class_names):
         x2 = int((x_center + width / 2) * img_w)
         y2 = int((y_center + height / 2) * img_h)
 
-        label = class_names[class_id]
+        label = class_names[class_id] if class_id < len(class_names) else str(class_id)
+        color = (0, 255, 0) if label == "0" else (0, 0, 255)
 
-        cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.rectangle(image, (x1, y1), (x2, y2), color, 2)
         cv2.putText(
-            image, label, (x1, max(y1 - 5, 0)),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2,
+            image,
+            label,
+            (x1, max(y1 - 5, 12)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            (0, 255, 255),
+            2,
         )
 
     return image
@@ -95,12 +76,7 @@ def qa_sample(
     debug: bool = False,
     delete: bool = False
 ) -> list[str]:
-    """Draw boxes on a random sample of images and save them for visual QA.
-
-    This is a manual sanity check: after building a dataset (especially
-    after copying files around, like build_merged_dataset does), the only
-    reliable way to catch a label/image mismatch is to actually look at
-    the pictures.
+    """Draw boxes on a random sample of images and save them for visual QA
 
     Args:
         dataset_path: Root path of the dataset to check (default: MERGED_DIR).
@@ -108,9 +84,6 @@ def qa_sample(
         n_samples: How many images to sample.
         debug: Boolean flag used for debugging.
         delete: if it's true the existing files at output_dir will be deleted.
-
-    Returns:
-        list[str]: Paths of the saved annotated images.
     """
 
     print("\n=== VISUAL QA ===")
@@ -125,7 +98,6 @@ def qa_sample(
     sample = random.sample(all_images, min(n_samples, len(all_images)))
 
     output_dir = os.path.join(OUTPUT_DIR, "qa_labels")
-
     os.makedirs(output_dir, exist_ok=True)
 
     if os.path.exists(output_dir) and delete:
@@ -142,7 +114,7 @@ def qa_sample(
 
     for fname in sample:
         image_path = os.path.join(images_dir, fname)
-        label_name = os.path.splitext(fname)[0] + ".txt"
+        label_name = f"{Path(fname).stem}.txt"
         label_path = os.path.join(labels_dir, label_name)
 
         image = cv2.imread(image_path)
@@ -164,9 +136,9 @@ def qa_sample(
         cv2.imwrite(out_path, image)
         saved_paths.append(out_path)
 
-    print(f"Saved {len(saved_paths)} annotated images to: {output_dir}")
+    print(f"\nSaved {len(saved_paths)} annotated images to: {output_dir}")
     return saved_paths
 
 
 if __name__ == "__main__":
-    qa_sample(dataset_path=MERGED_DIR, split="train", n_samples=10, delete=True)
+    qa_sample(dataset_path=MERGED_DIR, split="train", n_samples=5, delete=True)
