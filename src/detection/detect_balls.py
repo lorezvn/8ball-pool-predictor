@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 import sys
-from typing import Literal, Optional
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -10,7 +9,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from config import OUTPUT_DIR, VIDEOS
 
 
-def detect_balls(frame: np.ndarray, conf: float = 0.25, model_mode: str = "full") -> list[dict]:
+def detect_balls(frame: np.ndarray, conf: float = 0.2, model_mode: str = "full") -> list[dict]:
     """Runs YOLO inference and extracts ball locations and classified IDs."""
     if model_mode not in ("full", "trial"):
         raise ValueError(f"'{model_mode}' model mode is not valid. Insert 'full' or 'trial'")
@@ -19,7 +18,13 @@ def detect_balls(frame: np.ndarray, conf: float = 0.25, model_mode: str = "full"
     weights_path = os.path.join("models", model_mode, "weights", "best.pt")
     model = YOLO(weights_path)
 
-    results = model.predict(frame, conf=conf, verbose=False)[0]
+    results = model.predict(
+        frame,
+        conf=conf,              
+        iou=0.45,               # Soglia NMS
+        agnostic_nms=True,      # Evita box multipli sulla stessa identica palla
+        verbose=False,
+    )[0]
 
     balls = []
     for b in results.boxes:
@@ -64,6 +69,7 @@ def draw_ball_overlay(frame: np.ndarray, balls: list[dict]) -> np.ndarray:
 def save_ball_outputs(
     video_filename: str,
     frame_index: int = 0,
+    conf: float = 0.2,
     model_mode: str = "full",
 ):
     """Loads a frame, executes ball detection, and writes output overlay."""
@@ -76,19 +82,19 @@ def save_ball_outputs(
     if not ok:
         raise RuntimeError(f"Could not read frame {frame_index} from {video_path}")
 
-    balls = detect_balls(frame, model_mode=model_mode)
+    balls = detect_balls(frame, conf=conf, model_mode=model_mode)
     overlay = draw_ball_overlay(frame, balls)
 
     out_dir = os.path.join(OUTPUT_DIR, "table", "balls")
     os.makedirs(out_dir, exist_ok=True)
     tag = f"{Path(video_filename).stem}_f{frame_index}"
 
-    cv2.imwrite(os.path.join(out_dir, f"{model_mode}_balls_overlay_{tag}.png"), overlay)
+    cv2.imwrite(os.path.join(out_dir, f"{model_mode}_{conf}_balls_{tag}.png"), overlay)
     print(f"[{video_filename}] Detected {len(balls)} balls. Outputs saved in: {out_dir}")
 
 
 if __name__ == "__main__":
 
     for i in range(2, 6):
-        save_ball_outputs(f"video{i}.mp4", model_mode="full")
+        save_ball_outputs(f"video{i}.mp4", conf=0.35, model_mode="full")
 
