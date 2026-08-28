@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import cv2
 from tqdm import tqdm
+import numpy as np
 
 # Add 'src' to system path
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -10,6 +11,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from config import OUTPUT_DIR, VIDEOS
 from detection.detect_balls import detect_balls, draw_ball_overlay
 from detection.detect_pockets import draw_pockets_overlay, find_pockets
+from detection.detect_cue import detect_cue, draw_cue_overlay, find_cue_ball
 from detection.detect_table import detect_table, draw_table_overlay
 
 
@@ -18,11 +20,12 @@ def make_full_overlay_video(
     conf: float = 0.2,
     model_mode: str = "full",
     every: int = 1,
-    draw_balls: bool = True,
     draw_table: bool = True,
     draw_pockets: bool = True,
+    draw_cue_stick: bool = True,
+    draw_balls: bool = True,
 ):
-    """Processes a video and optionally renders selected overlays (balls, table, pockets)."""
+    """Processes a video and optionally renders selected overlays (balls, table, pockets, cue)."""
     video_path = os.path.join(VIDEOS, video_filename)
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
@@ -34,10 +37,11 @@ def make_full_overlay_video(
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
     # Generate an informative suffix for the output filename
-    # 't' = table, 'p' = pockets, 'b' = balls
+    # 't' = table, 'p' = pockets, 'c' = cue, 'b' = balls
     suffix = "".join([
         "t" if draw_table else "",
         "p" if draw_pockets else "",
+        "c" if draw_cue_stick else "",
         f"b_{conf}" if draw_balls else "",
     ]) or "raw"
 
@@ -51,7 +55,7 @@ def make_full_overlay_video(
     table_corners = None
     pockets = None
 
-    # Compute table and pockets on frame 0 only if at least one is requested
+    # Compute table and pockets on frame 0 only if requested
     if draw_table or draw_pockets:
         ok, first_frame = cap.read()
         if ok:
@@ -64,7 +68,9 @@ def make_full_overlay_video(
                 tqdm.write(f"[{video_filename}] Warning: Failed to detect table/pockets on frame 0: {e}")
             cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
 
-    last_overlay = None
+    last_cue_ball_pos = None
+    shot_taken = False
+    BALL_MOVEMENT_THRESHOLD = 4.0  # px: spostamento minimo che indica che la palla è partita
 
     with tqdm(total=total, desc=f"Processing {video_filename}", unit="frames") as pbar:
         for frame_idx in range(total):
@@ -83,10 +89,28 @@ def make_full_overlay_video(
                 if draw_pockets and pockets is not None:
                     current_frame = draw_pockets_overlay(current_frame, pockets)
 
-                # Ball detection and overlay
-                if draw_balls:
+                # Balls & Cue stick detection
+                if draw_balls or draw_cue_stick:
                     balls = detect_balls(frame, conf=conf, model_mode=model_mode)
-                    current_frame = draw_ball_overlay(current_frame, balls)
+                    cue_ball = find_cue_ball(balls)
+
+                    if cue_ball is not None:
+                        current_pos = cue_ball["center"]
+                        if last_cue_ball_pos is not None and not shot_taken:
+                            displacement = np.linalg.norm(current_pos - last_cue_ball_pos)
+                            if displacement > BALL_MOVEMENT_THRESHOLD:
+                                shot_taken = True  # Ball hit
+                        
+                        last_cue_ball_pos = current_pos
+
+                    # Draw cue only if the shot is not taken
+                    if draw_cue_stick and not shot_taken and cue_ball is not None:
+                        cue_data = detect_cue(frame, cue_ball["center"])
+                        current_frame = draw_cue_overlay(current_frame, cue_ball["center"], cue_data)
+
+                    # Ball bounding boxes overlay
+                    if draw_balls:
+                        current_frame = draw_ball_overlay(current_frame, balls)
 
                 last_overlay = current_frame
 
@@ -106,5 +130,7 @@ if __name__ == "__main__":
             model_mode="full",
             every=1,
             draw_table=False,
-            draw_pockets=False
+            draw_pockets=False,
+            draw_balls=True,
+            draw_cue_stick=True,
         )

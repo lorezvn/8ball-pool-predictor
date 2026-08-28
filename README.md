@@ -39,11 +39,13 @@ repo/
 - [x] Ottimizzare processi di merging datasets
 - [x] Detect tavolo
 - [x] Detect pockets
-- [x] Detect palle
+- [x] Detect palle 
+- [x] Detect stecca
+- [x] Detect direzione
 - [x] Sistemare la visualizzazione dell'overlay generale
 - [x] Sistemare struttura del progetto
-- [ ] Detect stecca
-- [ ] Detect direzione
+- [ ] Sistemare codice stecca e palle
+- [ ] Traiettoria
 - [ ] Mappa 2D
 - [ ] Dimostrazione visiva
 - [ ] Angolazione 

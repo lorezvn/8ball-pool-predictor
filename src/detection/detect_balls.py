@@ -8,6 +8,63 @@ from ultralytics import YOLO
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from config import OUTPUT_DIR, VIDEOS
 
+def _whiteness_score(frame: np.ndarray, box: tuple) -> float:
+    """Computes a whiteness metric (high value, low saturation) on the central patch
+    of the bounding box to ignore background cloth pixels at the corners.
+    """
+    x1, y1, x2, y2 = [int(v) for v in box]
+    h_box, w_box = y2 - y1, x2 - x1
+
+    # Sample only the central 50% area of the bounding box
+    cx1, cx2 = x1 + int(w_box * 0.25), x2 - int(w_box * 0.25)
+    cy1, cy2 = y1 + int(h_box * 0.25), y2 - int(h_box * 0.25)
+
+    roi = frame[max(0, cy1) : max(0, cy2), max(0, cx1) : max(0, cx2)]
+    if roi.size == 0:
+        return 0.0
+
+    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+    v = hsv[..., 2].astype(np.float32) / 255.0
+    s = hsv[..., 1].astype(np.float32) / 255.0
+
+    return float(np.mean(v * (1.0 - s)))
+
+
+def enforce_uniqueness(balls: list[dict]) -> list[dict]:
+    """Keeps at most one detection per class label (highest confidence wins);
+    duplicates are relabeled '?' rather than dropped, so they still count
+    as anonymous obstacles for the geometry."""
+    best_by_label: dict[str, int] = {}  # label -> index of best conf so far
+    for i, ball in enumerate(balls):
+        label = ball["label"]
+        if label not in best_by_label or ball["conf"] > balls[best_by_label[label]]["conf"]:
+            best_by_label[label] = i
+
+    keep_indices = set(best_by_label.values())
+    for i, ball in enumerate(balls):
+        if i not in keep_indices:
+            ball["label"] = "?"
+    return balls
+
+
+def enforce_cue_ball(frame: np.ndarray, balls: list[dict], min_score: float = 0.40) -> list[dict]:
+    """Forces exactly one detection to be the cue ball ('0') chosen by whiteness metric.
+    Demotes conflicting or duplicate '0' labels to '?'.
+    """
+    if not balls:
+        return balls
+
+    scores = [_whiteness_score(frame, b["box"]) for b in balls]
+    best_idx = int(np.argmax(scores))
+
+    for i, ball in enumerate(balls):
+        if i == best_idx and scores[best_idx] >= min_score:
+            ball["label"] = "0"
+        elif ball.get("label") == "0":
+            ball["label"] = "?"
+
+    return balls
+
 
 def detect_balls(frame: np.ndarray, conf: float = 0.2, model_mode: str = "full") -> list[dict]:
     """Runs YOLO inference and extracts ball locations and classified IDs."""
@@ -41,23 +98,7 @@ def detect_balls(frame: np.ndarray, conf: float = 0.2, model_mode: str = "full")
             "conf": confidence,
         })
 
-    return balls
-
-def enforce_uniqueness(balls: list[dict]) -> list[dict]:
-    """Keeps at most one detection per class label (highest confidence wins);
-    duplicates are relabeled '?' rather than dropped, so they still count
-    as anonymous obstacles for the geometry."""
-    best_by_label: dict[str, int] = {}  # label -> index of best conf so far
-    for i, ball in enumerate(balls):
-        label = ball["label"]
-        if label not in best_by_label or ball["conf"] > balls[best_by_label[label]]["conf"]:
-            best_by_label[label] = i
-
-    keep_indices = set(best_by_label.values())
-    for i, ball in enumerate(balls):
-        if i not in keep_indices:
-            ball["label"] = "?"
-    return balls
+    return enforce_cue_ball(frame, balls)
 
 
 def draw_ball_overlay(frame: np.ndarray, balls: list[dict]) -> np.ndarray:
