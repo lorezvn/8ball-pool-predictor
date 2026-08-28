@@ -110,58 +110,7 @@ def save_ball_outputs(
     print(f"[{video_filename}] Detected {len(balls)} balls. Outputs saved in: {out_dir}")
 
 
-def make_overlay_video(
-    video_filename: str,
-    conf: float = 0.2,
-    model_mode: str = "full",
-    every: int = 1,
-):
-    """Reads a video, runs ball detection frame by frame, writes an overlay video."""
-    video_path = os.path.join(VIDEOS, video_filename)
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise RuntimeError(f"Could not open video: {video_path}")
- 
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
- 
-    out_dir = os.path.join(OUTPUT_DIR, "videos")
-    os.makedirs(out_dir, exist_ok=True)
-    tag = f"{Path(video_filename).stem}_balls_{conf}"
-    out_path = os.path.join(out_dir, f"{tag}.mp4")
- 
-    writer = cv2.VideoWriter(out_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
- 
-    last_overlay = None
-    frame_idx = 0
-
-    while True:
-        ok, frame = cap.read()
-        if not ok:
-            break
- 
-        if frame_idx % every == 0:
-            balls = detect_balls(frame, conf=conf, model_mode=model_mode)
-            last_overlay = draw_ball_overlay(frame, balls)
- 
-        writer.write(last_overlay if last_overlay is not None else frame)
- 
-        frame_idx += 1
-        if frame_idx % 50 == 0:
-            print(f"[{video_filename}] {frame_idx}/{total} frame processed")
- 
-    cap.release()
-    writer.release()
-    print(f"[{video_filename}] Video saved in: {out_path}")
-
-
 if __name__ == "__main__":
-
-    #for i in range(2, 6):
-        #save_ball_outputs(f"video{i}.mp4", frame_index=100, model_mode="full")
-
     for i in range(2, 6):
-        make_overlay_video(f"video{i}.mp4")
+        save_ball_outputs(f"video{i}.mp4", frame_index=100, model_mode="full")
 

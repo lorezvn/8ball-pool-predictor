@@ -101,7 +101,7 @@ def detect_table(frame: np.ndarray) -> dict:
     }
 
 
-def draw_overlay(frame: np.ndarray, corners: np.ndarray) -> np.ndarray:
+def draw_table_overlay(frame: np.ndarray, corners: np.ndarray) -> np.ndarray:
     """Draws the detected bounding polygon and labeled corner vertices."""
     overlay = frame.copy()
     pts = corners.astype(int)
@@ -126,7 +126,7 @@ def save_table_outputs(video_filename: str, frame_index: int = 0):
         raise RuntimeError(f"Failed to read frame {frame_index} from {video_path}")
 
     res = detect_table(frame)
-    overlay = draw_overlay(frame, res["corners"])
+    overlay = draw_table_overlay(frame, res["corners"])
 
     out_dir = os.path.join(OUTPUT_DIR, "table")
     os.makedirs(out_dir, exist_ok=True)

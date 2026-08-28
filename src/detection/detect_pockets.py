@@ -34,15 +34,15 @@ def get_geometric_positions(corners: np.ndarray) -> np.ndarray:
     )
 
 
-def find_pockets(mask: np.ndarray, corners: np.ndarray) -> list[tuple[np.ndarray, float, float]]:
-    """Detects 6 table pockets by analyzing concave border regions with geometric fallback."""
+def extract_candidate_blobs(mask: np.ndarray) -> list[dict]:
+    """Isolates candidate pocket regions via morphological closing and difference analysis."""
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
-        raise ValueError("No valid contours found in cloth mask.")
+        raise ValueError("No valid contours found in the cloth mask.")
 
     largest_cnt = max(contours, key=cv2.contourArea)
 
-    # Fill contour and compute morphological difference
+    # Fill cloth contour and extract concave border regions
     filled = np.zeros(mask.shape, dtype=np.uint8)
     cv2.drawContours(filled, [largest_cnt], -1, 255, cv2.FILLED)
 
@@ -53,7 +53,6 @@ def find_pockets(mask: np.ndarray, corners: np.ndarray) -> list[tuple[np.ndarray
         diff, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
     )
 
-    # Extract candidate pocket blobs
     blob_contours, _ = cv2.findContours(diff, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     blobs = []
     for c in blob_contours:
@@ -62,30 +61,48 @@ def find_pockets(mask: np.ndarray, corners: np.ndarray) -> list[tuple[np.ndarray
         if m["m00"] == 0 or not (MIN_POCKET_AREA <= area <= MAX_POCKET_AREA):
             continue
         center = np.array([m["m10"] / m["m00"], m["m01"] / m["m00"]], dtype=np.float32)
-        radius = float(np.sqrt(area / np.pi))
-        blobs.append((center, radius, area))
+        blobs.append({"center": center, "radius": float(np.sqrt(area / np.pi)), "area": area})
 
-    # Match blobs to expected geometric anchor positions
+    return blobs
+
+
+def find_pockets(mask: np.ndarray, corners: np.ndarray) -> list[dict]:
+    """Matches detected blobs to the 6 expected pocket anchors with geometric fallback."""
+    blobs = extract_candidate_blobs(mask)
     geo_positions = get_geometric_positions(corners)
     pockets = []
+
     for g in geo_positions:
-        best_match, best_dist = None, MATCH_DIST
-        for center, radius, area in blobs:
-            dist = float(np.linalg.norm(center - g))
+        best_match = None
+        best_dist = MATCH_DIST
+
+        for blob in blobs:
+            dist = float(np.linalg.norm(blob["center"] - g))
             if dist < best_dist:
-                best_match, best_dist = (center, radius, area), dist
+                best_match = blob
+                best_dist = dist
 
         if best_match is not None:
             pockets.append(best_match)
         else:
-            # Fallback to pure geometric coordinate if occluded
-            pockets.append((g.astype(np.float32), 25.0, 0.0))
+            # Fallback to pure geometric coordinate when occluded
+            pockets.append({"center": g.astype(np.float32), "radius": 25.0, "area": 0.0})
 
     return pockets
 
 
+def draw_pockets_overlay(frame: np.ndarray, pockets: list[dict]) -> np.ndarray:
+    """Renders the 6 detected pocket positions onto the frame."""
+    overlay = frame.copy()
+    for p in pockets:
+        cx, cy = int(p["center"][0]), int(p["center"][1])
+        cv2.circle(overlay, (cx, cy), CAPTURE_R, (0, 0, 255), 3)
+        cv2.circle(overlay, (cx, cy), 4, (0, 255, 255), -1)
+    return overlay
+
+
 def save_pocket_outputs(video_filename: str, frame_index: int = 0):
-    """Detects pockets on a frame, projecting results to canonical view and saving outputs."""
+    """Extracts a frame, detects pockets, and writes both standard and top-down overlays."""
     video_path = os.path.join(VIDEOS, video_filename)
     cap = cv2.VideoCapture(video_path)
     cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
@@ -95,40 +112,30 @@ def save_pocket_outputs(video_filename: str, frame_index: int = 0):
     if not ok:
         raise RuntimeError(f"Could not read frame {frame_index} from {video_path}")
 
-    # Table Detection
+    # Run table and pocket detection pipelines
     table_data = detect_table(frame)
-    corners = table_data["corners"]
-    matrix = table_data["transform_matrix"]
+    pockets = find_pockets(table_data["mask"], table_data["corners"])
+
+    # Draw standard perspective overlay
+    overlay = draw_pockets_overlay(frame, pockets)
+
+    # Project pocket coordinates onto the top-down canonical view
     topdown = table_data["warped"].copy()
-
-    # Pocket Detection
-    pockets = find_pockets(table_data["mask"], corners)
-    centers = np.array([p[0] for p in pockets], dtype=np.float32)
-
-    # Project pocket centers to top-down view
+    centers = np.array([p["center"] for p in pockets], dtype=np.float32)
     centers_topdown = cv2.perspectiveTransform(
-        centers.reshape(-1, 1, 2), matrix
+        centers.reshape(-1, 1, 2), table_data["transform_matrix"]
     ).reshape(-1, 2)
 
-    # Draw overlays
-    overlay = frame.copy()
-    #cv2.polylines(overlay, [corners.astype(int)], isClosed=True, color=(0, 255, 255), thickness=2)
+    topdown_pockets = [{"center": pt} for pt in centers_topdown]
+    topdown_overlay = draw_pockets_overlay(topdown, topdown_pockets)
 
-    for p in centers:
-        cv2.circle(overlay, (int(p[0]), int(p[1])), CAPTURE_R, (0, 0, 255), 3)
-        cv2.circle(overlay, (int(p[0]), int(p[1])), 4, (0, 255, 255), -1)
-
-    for p in centers_topdown:
-        cv2.circle(topdown, (int(p[0]), int(p[1])), CAPTURE_R, (0, 0, 255), 3)
-        cv2.circle(topdown, (int(p[0]), int(p[1])), 4, (0, 255, 255), -1)
-
-    # Save outputs
+    # Save output images
     out_dir = os.path.join(OUTPUT_DIR, "table", "pockets")
     os.makedirs(out_dir, exist_ok=True)
     tag = f"{Path(video_filename).stem}_f{frame_index}"
 
     cv2.imwrite(os.path.join(out_dir, f"pockets_overlay_{tag}.png"), overlay)
-    cv2.imwrite(os.path.join(out_dir, f"pockets_topdown_{tag}.png"), topdown)
+    cv2.imwrite(os.path.join(out_dir, f"pockets_topdown_{tag}.png"), topdown_overlay)
 
     print(f"Detected {len(pockets)} pockets. Outputs saved in: {out_dir}")
 
