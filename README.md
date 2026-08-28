@@ -12,12 +12,38 @@ Project developed for the Computer Vision Course 2025/2026
     pip install -r requirements.txt
     ```
 
+## Repository structure
+
+```text
+repo/
+├── src/                    
+│   ├── detection/        # Detection modules
+│   │   ├── detect_balls.py   
+│   │   ├── detect_cue.py     
+│   │   ├── detect_pockets.py 
+│   │   └── detect_table.py   
+│   ├── tools/            # Utility scripts, QA, and visualization tools
+│   │   ├── compare_images.py 
+│   │   ├── inspect_video.py  
+│   │   ├── qa_labels.py     
+│   │   └── render_video.py   
+│   ├── config.py             # System configurations
+│   ├── dataset.py            # Dataset preparation
+│   ├── train.py              # Model training
+│   └── utils.py              # Helper functions
+├── main.py                 
+└── README.md
+```
+
 ## TO-DO 
 - [x] Ottimizzare processi di merging datasets
-- [x] Detect tavolo, detect pockets
-- [ ] Sistemare la visualizzazione dell'overlay generale
-- [ ] Detect palle, stecca, direzione
+- [x] Detect tavolo
+- [x] Detect pockets
+- [x] Detect palle
+- [x] Sistemare la visualizzazione dell'overlay generale
+- [x] Sistemare struttura del progetto
+- [ ] Detect stecca
+- [ ] Detect direzione
 - [ ] Mappa 2D
-- [ ] Sistemare struttura del progetto
 - [ ] Dimostrazione visiva
 - [ ] Angolazione 
