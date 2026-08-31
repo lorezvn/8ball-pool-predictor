@@ -1,6 +1,6 @@
 from src.utils import set_seed, create_folders
 from src.config import *
-from src.dataset import build_merged_dataset
+from src.dataset import build_merged_dataset, check_dataset
 from src.train import train_model
 from src.config import VIDEOS
 
@@ -13,4 +13,5 @@ def main():
     #train_model(full=True)
 
 if __name__ == '__main__':
-    main()
+    #main()
+    check_dataset(MERGED_DIR)

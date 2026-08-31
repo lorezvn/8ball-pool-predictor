@@ -258,14 +258,14 @@ def check_dataset(path: str) -> dict:
 
     info: dict = {"path": path, "splits": {}}
 
-    # 1. the base path must exist
+    # The base path must exist
     if not os.path.isdir(path):
         raise FileNotFoundError(
             f"Dataset not found: {path}\n"
             f"Check the .env file (is DATASET_DIR the right path?)"
         )
 
-    # 2. data.yaml holds the class names and is the source of truth
+    # data.yaml holds the class names and is the source of truth
     yaml_path = os.path.join(path, "data.yaml")
     if not os.path.isfile(yaml_path):
         raise FileNotFoundError(f"data.yaml not found in: {path}")
@@ -277,7 +277,7 @@ def check_dataset(path: str) -> dict:
     info["num_classes"] = len(names)
     info["names"] = names
 
-    # 3. for each split, check that images/ and labels/ exist and that the
+    # For each split, check that images/ and labels/ exist and that the
     #    number of images and labels match (a mismatch often signals
     #    unlabeled images or orphan label files)
     for split in ("train", "valid", "test"):
@@ -295,7 +295,7 @@ def check_dataset(path: str) -> dict:
 
         info["splits"][split] = {"n_images": n_images, "n_labels": n_labels}
 
-    # 4. human-readable summary
+    # Summary
     print(f" Dataset: {path}")
     print(f" Classes ({info['num_classes']}): {names}")
     for split, counts in info["splits"].items():
