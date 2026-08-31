@@ -123,10 +123,9 @@ def make_full_overlay_video(
 
 
 if __name__ == "__main__":
-    for i in range(6, 8):
         make_full_overlay_video(
-            f"video{i}.mp4",
-            conf=0.1,
+            f"prova.mkv",
+            conf=0.25,
             model_mode="full",
             every=1,
             draw_table=False,

@@ -98,7 +98,7 @@ def detect_balls(frame: np.ndarray, conf: float = 0.2, model_mode: str = "full")
             "conf": confidence,
         })
 
-    return balls
+    return enforce_cue_ball(frame, balls)
 
 
 def draw_ball_overlay(frame: np.ndarray, balls: list[dict]) -> np.ndarray:
