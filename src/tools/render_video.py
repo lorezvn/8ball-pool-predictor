@@ -18,7 +18,7 @@ from detection.detect_table import detect_table, draw_table_overlay
 def make_full_overlay_video(
     video_filename: str,
     conf: float = 0.2,
-    model_mode: str = "full",
+    model_mode: str = "full_1280",
     every: int = 1,
     draw_table: bool = True,
     draw_pockets: bool = True,
@@ -45,7 +45,7 @@ def make_full_overlay_video(
         f"b_{conf}" if draw_balls else "",
     ]) or "raw"
 
-    out_dir = os.path.join(OUTPUT_DIR, "videos")
+    out_dir = os.path.join(OUTPUT_DIR, "videos", f"{model_mode}")
     os.makedirs(out_dir, exist_ok=True)
     tag = f"{Path(video_filename).stem}_{suffix}"
     out_path = os.path.join(out_dir, f"{tag}.mp4")
@@ -72,7 +72,7 @@ def make_full_overlay_video(
     shot_taken = False
     BALL_MOVEMENT_THRESHOLD = 4.0  # px: spostamento minimo che indica che la palla è partita
 
-    with tqdm(total=total, desc=f"Processing {video_filename}", unit="frames") as pbar:
+    with tqdm(total=total, desc=f"Processing {video_filename} ({model_mode})", unit="frames") as pbar:
         for frame_idx in range(total):
             ok, frame = cap.read()
             if not ok:
@@ -123,13 +123,15 @@ def make_full_overlay_video(
 
 
 if __name__ == "__main__":
-        make_full_overlay_video(
-            f"prova.mkv",
-            conf=0.25,
-            model_mode="full",
-            every=1,
-            draw_table=False,
-            draw_pockets=False,
-            draw_balls=True,
-            draw_cue_stick=True,
-        )
+    for mode in ["trial", "full", "full_1280"]:
+        for i in range(1, 8):
+            make_full_overlay_video(
+                f"video{i}.mp4",
+                conf=0.3,
+                model_mode=mode,
+                every=1,
+                draw_table=False,
+                draw_pockets=False,
+                draw_balls=True,
+                draw_cue_stick=True,
+            )

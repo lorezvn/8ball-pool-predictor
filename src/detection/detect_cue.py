@@ -179,7 +179,7 @@ def draw_cue_overlay(
     return overlay
 
 
-def save_cue_outputs(video_filename: str, frame_index: int = 0, conf: float = 0.2, model_mode: str = "full"):
+def save_cue_outputs(video_filename: str, frame_index: int = 0, conf: float = 0.2, model_mode: str = "full_1280"):
     """Loads a single frame, extracts cue stick data, and writes the output overlay image."""
     video_path = os.path.join(VIDEOS, video_filename)
     cap = cv2.VideoCapture(video_path)

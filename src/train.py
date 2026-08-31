@@ -8,6 +8,7 @@ from .dataset import check_dataset
 
 TRIAL_CFG = dict(model="yolov8n.pt", epochs=3, imgsz=640, batch=16, name="trial")
 FULL_CFG = dict(model="yolov8s.pt", epochs=80, imgsz=640, batch=16, name="full")
+FULL_1280_CFG = dict(model="yolov8s.pt", epochs=150, imgsz=1280, batch=-1, name="full_1280")
 
 
 def train_model(full: bool = False) -> None:
@@ -22,7 +23,7 @@ def train_model(full: bool = False) -> None:
     """
     check_dataset(MERGED_DIR)
 
-    cfg = FULL_CFG if full else TRIAL_CFG
+    cfg = FULL_1280_CFG if full else TRIAL_CFG
     model_name, epochs, imgsz, batch, name = cfg.values()
     data_yaml = os.path.join(MERGED_DIR, "data.yaml")
 

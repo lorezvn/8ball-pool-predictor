@@ -8,77 +8,51 @@ from ultralytics import YOLO
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 from config import OUTPUT_DIR, VIDEOS
 
-def _whiteness_score(frame: np.ndarray, box: tuple) -> float:
-    """Computes a whiteness metric (high value, low saturation) on the central patch
-    of the bounding box to ignore background cloth pixels at the corners.
-    """
-    x1, y1, x2, y2 = [int(v) for v in box]
-    h_box, w_box = y2 - y1, x2 - x1
+# Loading the weights is expensive; keep one instance per mode alive instead of
+# re-reading them from disk on every frame.
+_MODELS: dict[str, YOLO] = {}
 
-    # Sample only the central 50% area of the bounding box
-    cx1, cx2 = x1 + int(w_box * 0.25), x2 - int(w_box * 0.25)
-    cy1, cy2 = y1 + int(h_box * 0.25), y2 - int(h_box * 0.25)
-
-    roi = frame[max(0, cy1) : max(0, cy2), max(0, cx1) : max(0, cx2)]
-    if roi.size == 0:
-        return 0.0
-
-    hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-    v = hsv[..., 2].astype(np.float32) / 255.0
-    s = hsv[..., 1].astype(np.float32) / 255.0
-
-    return float(np.mean(v * (1.0 - s)))
+# Mapping model to imgsz used in training
+MODEL_RESOLUTIONS = {
+    "trial": 640,
+    "full": 640,
+    "full_1280": 1280,
+}
 
 
-def enforce_uniqueness(balls: list[dict]) -> list[dict]:
-    """Keeps at most one detection per class label (highest confidence wins);
-    duplicates are relabeled '?' rather than dropped, so they still count
-    as anonymous obstacles for the geometry."""
-    best_by_label: dict[str, int] = {}  # label -> index of best conf so far
-    for i, ball in enumerate(balls):
-        label = ball["label"]
-        if label not in best_by_label or ball["conf"] > balls[best_by_label[label]]["conf"]:
-            best_by_label[label] = i
-
-    keep_indices = set(best_by_label.values())
-    for i, ball in enumerate(balls):
-        if i not in keep_indices:
-            ball["label"] = "?"
-    return balls
+def _weights_path(model_mode: str) -> str:
+    """Path of the weights for a run name, e.g. "full" -> models/full/weights/best.pt."""
+    return os.path.join("models", model_mode, "weights", "best.pt")
 
 
-def enforce_cue_ball(frame: np.ndarray, balls: list[dict], min_score: float = 0.40) -> list[dict]:
-    """Forces exactly one detection to be the cue ball ('0') chosen by whiteness metric.
-    Demotes conflicting or duplicate '0' labels to '?'.
-    """
-    if not balls:
-        return balls
-
-    scores = [_whiteness_score(frame, b["box"]) for b in balls]
-    best_idx = int(np.argmax(scores))
-
-    for i, ball in enumerate(balls):
-        if i == best_idx and scores[best_idx] >= min_score:
-            ball["label"] = "0"
-        elif ball.get("label") == "0":
-            ball["label"] = "?"
-
-    return balls
+def _get_model(model_mode: str) -> YOLO:
+    """Returns the cached YOLO model for the given mode, loading it on first use."""
+    if model_mode not in _MODELS:
+        _MODELS[model_mode] = YOLO(_weights_path(model_mode))
+    return _MODELS[model_mode]
 
 
 def detect_balls(frame: np.ndarray, conf: float = 0.2, model_mode: str = "full") -> list[dict]:
     """Runs YOLO inference and extracts ball locations and classified IDs."""
-    if model_mode not in ("full", "trial"):
-        raise ValueError(f"'{model_mode}' model mode is not valid. Insert 'full' or 'trial'")
 
+    if not os.path.isfile(_weights_path(model_mode)):
+        available = sorted(
+            d for d in os.listdir("models")
+            if os.path.isfile(_weights_path(d))
+        ) if os.path.isdir("models") else []
+        raise ValueError(
+            f"No weights at {_weights_path(model_mode)}. Available: {available or 'none'}"
+        )
 
-    weights_path = os.path.join("models", model_mode, "weights", "best.pt")
-    model = YOLO(weights_path)
+    model = _get_model(model_mode)
+
+    infer_imgsz = MODEL_RESOLUTIONS.get(model_mode, 640)
 
     results = model.predict(
         frame,
         conf=conf,              
         iou=0.45,               # NMS IoU threshold: suppresses overlapping boxes with >45% area overlap
+        imgsz=infer_imgsz,      # must match the training resolution
         agnostic_nms=True,      # Avoid multiple box on the same ball
         verbose=False,
     )[0]
@@ -98,7 +72,7 @@ def detect_balls(frame: np.ndarray, conf: float = 0.2, model_mode: str = "full")
             "conf": confidence,
         })
 
-    return enforce_cue_ball(frame, balls)
+    return balls
 
 
 def draw_ball_overlay(frame: np.ndarray, balls: list[dict]) -> np.ndarray:
@@ -139,7 +113,6 @@ def save_ball_outputs(
     if not ok:
         raise RuntimeError(f"Could not read frame {frame_index} from {video_path}")
 
-    #balls = enforce_uniqueness(detect_balls(frame, conf=conf, model_mode=model_mode))
     balls = detect_balls(frame, conf=conf, model_mode=model_mode)
     overlay = draw_ball_overlay(frame, balls)
 
@@ -153,5 +126,5 @@ def save_ball_outputs(
 
 if __name__ == "__main__":
     for i in range(2, 6):
-        save_ball_outputs(f"video{i}.mp4", frame_index=100, model_mode="full")
+        save_ball_outputs(f"video{i}.mp4", frame_index=100, model_mode="full_1280")
 
