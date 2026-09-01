@@ -10,6 +10,22 @@ TRIAL_CFG = dict(model="yolov8n.pt", epochs=3, imgsz=640, batch=16, name="trial"
 FULL_CFG = dict(model="yolov8s.pt", epochs=80, imgsz=640, batch=16, name="full")
 FULL_1280_CFG = dict(model="yolov8s.pt", epochs=150, imgsz=1280, batch=-1, name="full_1280")
 
+AUGMENT_CFG = dict(
+    hsv_h=0.010,       # default 0.015 -- LOWERED: hue is the class identity here,
+                       # rotating it turns a red ball orange while the label still says "3"
+    hsv_s=0.7,
+    hsv_v=0.5,         # raised from 0.4: lighting varies a lot between videos
+    degrees=10.0,      # camera roll
+    translate=0.1,
+    scale=0.3,         # default 0.5 -- LOWERED: zooming out would shrink the balls
+                       # back to ~9 px and undo the imgsz gain
+    perspective=0.0005,
+    fliplr=0.5,
+    flipud=0.0,        # an upside-down table does not exist
+    mosaic=1.0,
+    mixup=0.0,         # label ambiguity on 19 px objects
+)
+
 
 def train_model(full: bool = False) -> None:
     """
@@ -49,4 +65,6 @@ def train_model(full: bool = False) -> None:
         name=name,
         exist_ok=True,
         project=os.path.abspath("models"),  # absolute path: avoids ultralytic merging it with its own runs_dir
+        cos_lr=True,
+        **AUGMENT_CFG
     )
