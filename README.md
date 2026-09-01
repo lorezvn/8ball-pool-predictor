@@ -46,7 +46,7 @@ repo/
 - [x] Sistemare struttura del progetto
 - [ ] Trovare video migliori per prove
 - [ ] Sistemare codice stecca e palle
-- [ ] Traiettoria
+- [x] Traiettoria
 - [ ] Mappa 2D
 - [ ] Dimostrazione visiva
 - [ ] Angolazione 
