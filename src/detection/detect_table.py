@@ -5,11 +5,10 @@ import cv2
 import numpy as np
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from config import OUTPUT_DIR, VIDEOS
+from config import OUTPUT_DIR, VIDEOS, CANONICAL_H, CANONICAL_W
 
 # Color and canonical size configuration
 HUE_TOL, SAT_TOL, VAL_TOL = 15, 80, 90
-CANONICAL_W, CANONICAL_H = 1000, 500
 
 
 def get_cloth_mask(frame: np.ndarray) -> np.ndarray:
@@ -99,45 +98,3 @@ def detect_table(frame: np.ndarray) -> dict:
         "transform_matrix": matrix,
         "warped": warped,
     }
-
-
-def draw_table_overlay(frame: np.ndarray, corners: np.ndarray) -> np.ndarray:
-    """Draws the detected bounding polygon and labeled corner vertices."""
-    overlay = frame.copy()
-    pts = corners.astype(int)
-
-    cv2.polylines(overlay, [pts], isClosed=True, color=(0, 255, 255), thickness=3)
-    for (x, y), label in zip(pts, ["TL", "TR", "BR", "BL"]):
-        cv2.circle(overlay, (x, y), 8, (0, 0, 255), -1)
-        cv2.putText(overlay, label, (x + 8, y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-    return overlay
-
-
-def save_table_outputs(video_filename: str, frame_index: int = 0):
-    """Extracts a frame from a video, detects the table, and saves the output assets."""
-    video_path = os.path.join(VIDEOS, video_filename)
-    cap = cv2.VideoCapture(video_path)
-
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
-    ok, frame = cap.read()
-    cap.release()
-
-    if not ok:
-        raise RuntimeError(f"Failed to read frame {frame_index} from {video_path}")
-
-    res = detect_table(frame)
-    overlay = draw_table_overlay(frame, res["corners"])
-
-    out_dir = os.path.join(OUTPUT_DIR, "table")
-    os.makedirs(out_dir, exist_ok=True)
-    tag = f"{Path(video_filename).stem}_f{frame_index}"
-
-    cv2.imwrite(os.path.join(out_dir, f"table_overlay_{tag}.png"), overlay)
-    cv2.imwrite(os.path.join(out_dir, f"table_mask_{tag}.png"), res["mask"])
-    cv2.imwrite(os.path.join(out_dir, f"table_topdown_{tag}.png"), res["warped"])
-
-    print(f"Files saved successfully to: {out_dir}")
-
-
-if __name__ == "__main__":
-    save_table_outputs("video2.mp4")

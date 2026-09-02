@@ -44,9 +44,9 @@ repo/
 - [x] Detect direzione
 - [x] Sistemare la visualizzazione dell'overlay generale
 - [x] Sistemare struttura del progetto
-- [ ] Trovare video migliori per prove
-- [ ] Sistemare codice stecca e palle
-- [ ] Traiettoria
+- [ ] Sistemare codice prediction folder
+- [ ] Sistemare gestione di costanti
+- [x] Traiettoria
 - [ ] Mappa 2D
 - [ ] Dimostrazione visiva
 - [ ] Angolazione 

@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from detection.detect_table import CANONICAL_W, CANONICAL_H
+from config import CANONICAL_W, CANONICAL_H, POCKETS_TOP
 
 # Cushion bounces allowed inside a single link. 0 means a clean straight line,
 # which is the only regime that is actually meaningful today: without a friction
@@ -33,17 +33,6 @@ MAX_DEPTH = 3           # how many balls deep the collision chain may go
 # The sample is small -- 9 clips, of which two pairs are the same shot -- so treat
 # this as a reasonable setting, not a solid calibration.
 CAPTURE_FACTOR = 3.2
-
-# In the canonical view the pockets are exactly the 4 corners plus the midpoints
-# of the two long edges, so they need no detection.
-POCKETS_TOP = [
-    (0.0, 0.0),
-    (CANONICAL_W, 0.0),
-    (CANONICAL_W, CANONICAL_H),
-    (0.0, CANONICAL_H),
-    (CANONICAL_W / 2, 0.0),
-    (CANONICAL_W / 2, CANONICAL_H),
-]
 
 
 def nearest_wall(point: np.ndarray, direction: np.ndarray, radius: float) -> tuple:

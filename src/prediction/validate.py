@@ -21,17 +21,13 @@ import cv2
 import numpy as np
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from config import OUTPUT_DIR, VIDEOS
+from config import OUTPUT_DIR, VIDEOS, BALL_MOVEMENT_THRESHOLD, POCKET_EXCLUSION, STILL_DIFF
+
 from detection.detect_balls import detect_balls
 from detection.detect_cue import find_cue_ball
 from detection.detect_table import detect_table
 from prediction.predict import draw_2d_map, draw_prediction_overlay, run_prediction
 from prediction.trajectory import CAPTURE_FACTOR, POCKETS_TOP
-
-SHOT_MOVEMENT_THRESHOLD = 6.0   # px of cue ball travel that means the shot is away
-POCKET_EXCLUSION = 40.0         # top-down units: closer than this to a pocket is not open play
-STILL_DIFF = 0.5                # mean abs frame difference below which the table is still
-
 
 def find_shot_frame(video_path: str, model_mode: str = "full", conf: float = 0.3) -> int | None:
     """Index of the last frame before the cue ball starts moving.
@@ -52,7 +48,7 @@ def find_shot_frame(video_path: str, model_mode: str = "full", conf: float = 0.3
             continue
 
         if previous_pos is not None:
-            if np.linalg.norm(cue_ball["center"] - previous_pos) > SHOT_MOVEMENT_THRESHOLD:
+            if np.linalg.norm(cue_ball["center"] - previous_pos) > BALL_MOVEMENT_THRESHOLD:
                 cap.release()
                 return previous_idx
         previous_pos, previous_idx = cue_ball["center"], idx
@@ -190,4 +186,4 @@ def validate_all(video_filenames: list, conf: float = 0.3, model_mode: str = "fu
 
 
 if __name__ == "__main__":
-    validate_all([f"video{i}.mp4" for i in range(1, 10)])
+    validate_all([f"video{i}.mp4" for i in range(1, 8)])

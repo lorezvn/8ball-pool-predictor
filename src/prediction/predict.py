@@ -12,45 +12,17 @@ import cv2
 import numpy as np
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
-from config import OUTPUT_DIR, VIDEOS
+from config import OUTPUT_DIR, VIDEOS, CANONICAL_W, CANONICAL_H, POCKETS_TOP
 from detection.detect_balls import detect_balls
 from detection.detect_cue import detect_cue, find_cue_ball
-from detection.detect_table import CANONICAL_W, CANONICAL_H, detect_table
+from detection.detect_table import detect_table
 from prediction.trajectory import (
     CAPTURE_FACTOR,
     MAX_BOUNCES,
     MAX_DEPTH,
-    POCKETS_TOP,
     cue_deflection,
     simulate_chain,
 )
-
-# Standard ball colours for the schematic 2D map (BGR). 9-15 reuse the colour of
-# 1-7 with a white ring drawn on top.
-BALL_BGR = {
-    "0": (255, 255, 255), "1": (0, 215, 255), "2": (200, 0, 0), "3": (0, 0, 220),
-    "4": (150, 30, 140), "5": (0, 140, 255), "6": (0, 150, 0), "7": (40, 40, 140),
-    "8": (20, 20, 20), "?": (130, 130, 130),
-}
-
-CHAIN_PALETTE = [(0, 200, 0), (255, 200, 0), (255, 0, 200), (0, 200, 255)]
-CUE_PATH_BGR = (0, 0, 255)
-DEFLECTION_BGR = (200, 200, 200)
-
-
-def base_color(label: str) -> tuple:
-    """Colour of a ball, mapping stripes 9-15 onto their solid counterparts."""
-    if label in BALL_BGR:
-        return BALL_BGR[label]
-    number = int(label)
-    return BALL_BGR.get(str(number - 8), (130, 130, 130)) if number > 8 else (130, 130, 130)
-
-
-def outcome_text(pred: dict) -> str:
-    """One-line description of the predicted outcome."""
-    if pred["outcome"] == "IN":
-        return f"IN: ball {pred['potted_label']}"
-    return pred["outcome"]
 
 
 def run_prediction(
@@ -144,130 +116,3 @@ def run_prediction(
         "radius_top": radius,
         "capture": capture,
     }
-
-
-def _draw_path(overlay: np.ndarray, path_top, matrix_inv, color, thickness=3) -> None:
-    """Project a top-down path back onto the frame and stroke it."""
-    pts = cv2.perspectiveTransform(np.array([path_top], dtype=np.float32), matrix_inv)[0]
-    for a, b in zip(pts[:-1], pts[1:]):
-        cv2.line(overlay, tuple(a.astype(int)), tuple(b.astype(int)), color, thickness, cv2.LINE_AA)
-
-
-def draw_chain_paths(overlay: np.ndarray, pred: dict) -> None:
-    """Stroke the predicted chain and the cue ball deflection onto the overlay."""
-    for path, ball_index in pred["segments"]:
-        color = CUE_PATH_BGR if ball_index is None else CHAIN_PALETTE[ball_index % len(CHAIN_PALETTE)]
-        _draw_path(overlay, path, pred["matrix_inv"], color, 3)
-
-    if pred["deflection"] is not None:
-        _draw_path(overlay, pred["deflection"], pred["matrix_inv"], DEFLECTION_BGR, 2)
-
-
-def draw_outcome_banner(overlay: np.ndarray, text: str, positive: bool) -> None:
-    """Write the outcome in the top-left corner."""
-    cv2.putText(overlay, text, (40, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.6, (0, 0, 0), 8, cv2.LINE_AA)
-    cv2.putText(overlay, text, (40, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.6,
-                (0, 200, 0) if positive else (0, 0, 255), 4, cv2.LINE_AA)
-
-
-def draw_prediction_overlay(frame: np.ndarray, pred: dict) -> np.ndarray:
-    """Draw the predicted chain, the cue ball deflection and the outcome."""
-    overlay = frame.copy()
-    draw_chain_paths(overlay, pred)
-
-    for ball in pred["balls"]:
-        x, y = int(ball["center"][0]), int(ball["center"][1])
-        color = (255, 255, 255) if ball["label"] == "0" else (0, 255, 255)
-        cv2.putText(overlay, ball["label"], (x - 10, y - 16),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 4, cv2.LINE_AA)
-        cv2.putText(overlay, ball["label"], (x - 10, y - 16),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2, cv2.LINE_AA)
-
-    if pred["potted_index"] is not None and pred["potted_index"] >= 0:
-        potted = pred["others"][pred["potted_index"]]
-        cv2.circle(overlay, tuple(potted["center"].astype(int)),
-                   int(potted["radius"]) + 6, (0, 200, 0), 3, cv2.LINE_AA)
-
-    text = outcome_text(pred)
-    if pred["scratches"] and pred["outcome"] != "SCRATCH":
-        text += " + SCRATCH RISK"
-    draw_outcome_banner(overlay, text, pred["outcome"] == "IN")
-    return overlay
-
-
-def draw_2d_map(pred: dict, margin: int = 70) -> np.ndarray:
-    """Schematic top-down map: table, pockets, numbered balls and the chain."""
-    w, h = int(CANONICAL_W), int(CANONICAL_H)
-    canvas = np.full((h + 2 * margin, w + 2 * margin, 3), (70, 70, 70), np.uint8)
-
-    cv2.rectangle(canvas, (margin, margin), (margin + w, margin + h), (150, 110, 40), -1)
-    cv2.rectangle(canvas, (margin, margin), (margin + w, margin + h), (40, 40, 40), 4)
-    for px, py in POCKETS_TOP:
-        cv2.circle(canvas, (int(px) + margin, int(py) + margin), 20, (25, 25, 25), -1)
-
-    def stroke(path, color, thickness):
-        pts = [(int(p[0]) + margin, int(p[1]) + margin) for p in path]
-        for a, b in zip(pts[:-1], pts[1:]):
-            cv2.line(canvas, a, b, color, thickness, cv2.LINE_AA)
-
-    for path, ball_index in pred["segments"]:
-        color = CUE_PATH_BGR if ball_index is None else CHAIN_PALETTE[ball_index % len(CHAIN_PALETTE)]
-        stroke(path, color, 2)
-    if pred["deflection"] is not None:
-        stroke(pred["deflection"], DEFLECTION_BGR, 2)
-
-    radius = max(10, int(pred["radius_top"]))
-    for ball in pred["balls"]:
-        centre = pred["to_top"](ball["center"])
-        c = (int(centre[0]) + margin, int(centre[1]) + margin)
-        cv2.circle(canvas, c, radius, base_color(ball["label"]), -1)
-        if ball["label"] not in ("0", "?") and int(ball["label"]) > 8:
-            cv2.circle(canvas, c, radius, (255, 255, 255), 2)     # stripe ring
-        cv2.circle(canvas, c, radius, (0, 0, 0), 1)
-        cv2.putText(canvas, ball["label"], (c[0] - 7, c[1] - radius - 4),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, (255, 255, 255), 1, cv2.LINE_AA)
-
-    text = outcome_text(pred)
-    cv2.putText(canvas, text, (margin, 45), cv2.FONT_HERSHEY_SIMPLEX, 1.1,
-                (0, 200, 0) if pred["outcome"] == "IN" else (0, 0, 255), 3, cv2.LINE_AA)
-    return canvas
-
-
-def save_prediction_outputs(
-    video_filename: str,
-    frame_index: int = 0,
-    conf: float = 0.3,
-    model_mode: str = "full",
-    max_bounces: int = MAX_BOUNCES,
-):
-    """Predict the shot on one frame and write the overlay and the 2D map."""
-    video_path = os.path.join(VIDEOS, video_filename)
-    cap = cv2.VideoCapture(video_path)
-    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
-    ok, frame = cap.read()
-    cap.release()
-
-    if not ok:
-        raise RuntimeError(f"Could not read frame {frame_index} from {video_path}")
-
-    pred = run_prediction(frame, conf=conf, model_mode=model_mode, max_bounces=max_bounces)
-    if pred is None:
-        print(f"[{video_filename} f{frame_index}] cue ball or cue stick not found, skipped.")
-        return None
-
-    out_dir = os.path.join(OUTPUT_DIR, "prediction")
-    os.makedirs(out_dir, exist_ok=True)
-    tag = f"{Path(video_filename).stem}_f{frame_index}"
-
-    cv2.imwrite(os.path.join(out_dir, f"predict_{tag}.png"), draw_prediction_overlay(frame, pred))
-    cv2.imwrite(os.path.join(out_dir, f"map_{tag}.png"), draw_2d_map(pred))
-
-    chain = " -> ".join(pred["chain"]) if pred["chain"] else "no ball hit"
-    scratch = " | scratch risk" if pred["scratches"] else ""
-    print(f"[{video_filename} f{frame_index}] {pred['outcome']} | chain: cue -> {chain}"
-          f"{scratch} | saved in {out_dir}")
-    return pred
-
-
-if __name__ == "__main__":
-    save_prediction_outputs("video8.mp4", frame_index=20)
