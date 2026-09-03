@@ -48,5 +48,5 @@ repo/
 - [ ] Sistemare gestione di costanti
 - [x] Traiettoria
 - [ ] Mappa 2D
-- [ ] Dimostrazione visiva
 - [ ] Angolazione 
+- [x] Dimostrazione visiva
